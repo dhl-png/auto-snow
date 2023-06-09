@@ -1,0 +1,19 @@
+{
+  "name": "automate",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+ssh://git@github.com/dhl-png/auto-snow.git"
+  },
+  "author": "Finley Tohill",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/dhl-png/auto-snow/issues"
+  },
+  "homepage": "https://github.com/dhl-png/auto-snow#readme"
+}
