@@ -39,8 +39,10 @@ async function getButtonsFromShadowRoot(shadowRootHandle) {
 
 
 (async () => {
-    const url = "https://rhcgroupprod.service-now.com/now/workspace/agent/home/sub/non_record/layout/params/list-title/New%20interactions/table/interaction/query/state%3Dnew/workspace-config-id/7b24ceae5304130084acddeeff7b12a3/word-wrap/false/disable-quick-edit/true"
+    //const url = "https://rhcgroupprod.service-now.com/now/workspace/agent/home/sub/non_record/layout/params/list-title/New%20interactions/table/interaction/query/state%3Dnew/workspace-config-id/7b24ceae5304130084acddeeff7b12a3/word-wrap/false/disable-quick-edit/true"
    // const url = "https://rhcgroupprod.service-now.com/now/workspace/agent/record/interaction/078da68f871fa510f051cae20cbb353c/sub/record/incident/72bd2e8f871fa510f051cae20cbb3533"
+    const url = "https://rhcgroupprod.service-now.com/now/workspace/agent/record/interaction/647377878793e510f051cae20cbb35ed"
+
     const browser = await puppeteer.launch({headless: false});
     const page = await browser.newPage();
     page.on('console', message => {
@@ -73,13 +75,14 @@ async function getButtonsFromShadowRoot(shadowRootHandle) {
 
 
 async function descriptionEditTest(page) {
-
+    let title = "test";
     let description = await getDescription(page);
-    await page.evalute((description) => {
-        console.log(description.textContent)
-    }, description)
+    await page.evaluate((description,title) => {
+        if(description.value.toLowerCase().includes("urgent")) console.log("WARNING URGENT TICKET FOUND");
+        if (description.value === '') description.value = title
+    }, description, title)
 
-    await handleClick(page, await getIncidentButton());
+    //await handleClick(page, await getIncidentButton(page));
     await page.waitForTimeout(100000);
 }
 
@@ -102,10 +105,23 @@ async function search(page){
 
         await page.waitForTimeout(1000);
         //Create incident
+
+        let description = await getDescription(page);
+        let isUrgent = await page.evaluate((description,title) => {
+            if (description.value === '') description.value = title
+            return (description.value.toLowerCase().includes("urgent"))
+        }, description, linkSelector.text)
+
         let incidentButton = await getIncidentButton(page);
         await page.evaluate((button) => {
              button.click();
         }, incidentButton)
+
+        if(isUrgent){
+            console.log("AAHHHHHHHHH")
+            //TODO: Pass is urgent into template buttons
+            //Create templateBuilder function
+        }
 
         await page.waitForNavigation({waitUntil: 'networkidle2'})
         await page.waitForTimeout(2000);
@@ -192,13 +208,13 @@ async function getDescription(page) {
 
     let descriptionHandle = await page.evaluateHandle(() => {
         let description = document.querySelector("body > sn-workspace-layout > sn-workspace-main > sn-workspace-content").shadowRoot
-        .querySelector("#chrome-tab-panel-record_fa8f574bdb5ba11074a02ebbd39619fd > sn-interaction-custom-renderer").shadowRoot
+        .querySelector("sn-interaction-custom-renderer").shadowRoot
         .querySelector("now-record-form-connected").shadowRoot
         .querySelector("div > sn-form-internal-workspace-form-layout").shadowRoot
         .querySelector("form > section > div > now-record-form-blob").shadowRoot
         .querySelector("sn-form-internal-tabs").shadowRoot
         .querySelector("section > sn-form-internal-tab-contents").shadowRoot
-        .querySelector("#tab_panel_0_undefined > now-record-form-section-column-layout").shadowRoot
+        .querySelector("now-record-form-section-column-layout").shadowRoot
         .querySelector("div > div > div.sn-form-column-layout-left-col.sn-form-column-layout-col.resizable-controller.resizable-left-column.flex-resize.state-resizing > div > section > div > div > div:nth-child(6) > div > sn-record-input-connected:nth-child(2)").shadowRoot
         .querySelector("now-textarea").shadowRoot
         .querySelector("textarea[name=u_description]")
