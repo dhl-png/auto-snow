@@ -135,6 +135,10 @@ function getType(title){
     if (title.startsWith("New Referrer Application Form :")) {
         return "New Referrer"
     }
+    //Current referere
+    if (title.startsWith("Current Referrer Application Form :")) {
+        return "New Referrer"
+    }
 
     //Mimecast
     if(title === "You have new held messages") {
