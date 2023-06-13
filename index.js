@@ -58,7 +58,8 @@ async function getButtonsFromShadowRoot(shadowRootHandle) {
     await page.waitForTimeout(1000);
 
     while(true) {
-       await search(page);
+       //await search(page);
+        await descriptionEditTest(page);
         await page.waitForTimeout(10000);
 
         //get Refresh button
@@ -71,6 +72,22 @@ async function getButtonsFromShadowRoot(shadowRootHandle) {
 })();
 
 
+async function descriptionEditTest(page) {
+
+    let description = await getDescription(page);
+    await page.evalute((description) => {
+        console.log(description.textContent)
+    }, description)
+
+    await handleClick(page, await getIncidentButton());
+    await page.waitForTimeout(100000);
+}
+
+async function handleClick(page, button){
+    await page.evaluate((button) => {
+        button.click();
+    },button)
+}
 
 async function search(page){
 
@@ -167,6 +184,27 @@ async function login(page){
     await page.evaluate(() => {
         document.querySelector('form').submit();
     })
+}
+
+async function getDescription(page) {
+    await page.waitForSelector("body > sn-workspace-layout > sn-workspace-main > sn-workspace-content")
+    await page.waitForTimeout(200);
+
+    let descriptionHandle = await page.evaluateHandle(() => {
+        let description = document.querySelector("body > sn-workspace-layout > sn-workspace-main > sn-workspace-content").shadowRoot
+        .querySelector("#chrome-tab-panel-record_fa8f574bdb5ba11074a02ebbd39619fd > sn-interaction-custom-renderer").shadowRoot
+        .querySelector("now-record-form-connected").shadowRoot
+        .querySelector("div > sn-form-internal-workspace-form-layout").shadowRoot
+        .querySelector("form > section > div > now-record-form-blob").shadowRoot
+        .querySelector("sn-form-internal-tabs").shadowRoot
+        .querySelector("section > sn-form-internal-tab-contents").shadowRoot
+        .querySelector("#tab_panel_0_undefined > now-record-form-section-column-layout").shadowRoot
+        .querySelector("div > div > div.sn-form-column-layout-left-col.sn-form-column-layout-col.resizable-controller.resizable-left-column.flex-resize.state-resizing > div > section > div > div > div:nth-child(6) > div > sn-record-input-connected:nth-child(2)").shadowRoot
+        .querySelector("now-textarea").shadowRoot
+        .querySelector("textarea[name=u_description]")
+        return description
+    });
+    return descriptionHandle
 }
 
 async function getTemplateButton(page, type) {
