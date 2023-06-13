@@ -38,6 +38,7 @@ async function getButtonsFromShadowRoot(shadowRootHandle) {
 }
 
 
+let ticketCount = 0;
 (async () => {
     const url = "https://rhcgroupprod.service-now.com/now/workspace/agent/home/sub/non_record/layout/params/list-title/New%20interactions/table/interaction/query/state%3Dnew/workspace-config-id/7b24ceae5304130084acddeeff7b12a3/word-wrap/false/disable-quick-edit/true"
 
@@ -71,18 +72,6 @@ async function getButtonsFromShadowRoot(shadowRootHandle) {
 })();
 
 
-async function descriptionEditTest(page) {
-    let title = "test";
-    let description = await getDescription(page);
-    await page.evaluate((description,title) => {
-        if(description.value.toLowerCase().includes("urgent")) console.log("WARNING URGENT TICKET FOUND");
-        if (description.value === '') description.value = title
-    }, description, title)
-
-    //await handleClick(page, await getIncidentButton(page));
-    await page.waitForTimeout(100000);
-}
-
 async function handleClick(page, button){
     await page.evaluate((button) => {
         button.click();
@@ -92,7 +81,10 @@ async function handleClick(page, button){
 async function search(page){
 
     let [linkSelectors,sr4Handle] = await getLinkSelector(page);
-
+    console.log(`
+        I have completed ${ticketCount} tickets\n
+        I have saved Finley and Rutvik ${ticketCount*5} clicks \n
+        Yet I am getting paid nothing...`)
     for (let linkSelector of linkSelectors) {
         let linkHandle = await sr4Handle.evaluateHandle((root, selector) => root.querySelector(selector), linkSelector.link);
         await linkHandle.click();
@@ -103,26 +95,30 @@ async function search(page){
         await page.waitForTimeout(1000);
         //Check description for urgency
         let description = await getDescription(page);
-        let isUrgent = await page.evaluate((description,title) => {
-            if (description.value === '') description.value = title
-            return (description.value.toLowerCase().includes("urgent"))
+        let descriptionValue = await page.evaluate((description,title) => {
+            if (description.value === '') {
+                description.value = title
+            }
+                return (description.value)
         }, description, linkSelector.text)
+        handleClick(page, await getUpdateButton(page))
+        isUrgent = getUrgency(descriptionValue)
+
+        await page.waitForTimeout(500);
 
         let incidentButton = await getIncidentButton(page);
         await page.evaluate((button) => {
              button.click();
         }, incidentButton)
 
-        if(isUrgent){
-            console.log("AAHHHHHHHHH")
-            //TODO: Pass is urgent into template buttons
-            //Create templateBuilder function
-        }
+        if(isUrgent){console.log("AAHHHHHHHHH")}
 
         await page.waitForNavigation({waitUntil: 'networkidle2'})
         await page.waitForTimeout(2000);
         //Click on template
-        let templateButton = await getTemplateButton(page,getType(linkSelector.text));
+        let templateType = getTemplateType(getType(linkSelector.text),isUrgent);
+
+        let templateButton = await getTemplateButton(page,templateType);
         await page.evaluate((button) => {
             button.click()
         },templateButton)
@@ -138,7 +134,57 @@ async function search(page){
         await page.evaluate((button) => {
             button.click();
         },closeButton)
+        ticketCount ++;
     }
+}
+
+
+function getUrgency(description) {
+    let text = description.toLowerCase()
+    let searchPattern = /(urgent|urgently|asap)/gi;
+    return searchPattern.test(text.replace(/[.,\/#!$%\^&\*;:{}=\-_`~()]/g," "))
+}
+
+function getTemplateType(type, urgent) {
+    let template;
+
+    if (urgent) {
+        switch(type) {
+            case "Transfer":
+                template = 9;
+                break;
+            default:
+                template = 0;
+                break;
+        }
+
+    } else {
+        switch(type) {
+            case "Data Mismatch":
+                template = 1;
+                break;
+            case "Mimecast":
+                template = 2;
+                break;
+            case "New Referrer":
+                template = 3;
+                break;
+            case "Pacs":
+                template = 4;
+                break;
+            case "Transfer":
+                template = 8;
+                break
+            case "Staff":
+                template = 10;
+                break;
+            default:
+                template = 0;
+                break;
+        }
+    }
+    console.log(`template is ${template}`)
+    return template
 }
 
 async function getLinkSelector(page) {
@@ -150,6 +196,24 @@ async function getLinkSelector(page) {
 
     const linkSelectors = await getButtonsFromShadowRoot(sr4Handle);
     return [linkSelectors, sr4Handle]
+}
+
+async function getUpdateButton(page) {
+    await page.waitForSelector("body > sn-workspace-layout > sn-workspace-main > sn-workspace-content")
+    await page.waitForTimeout(200);
+    let updateButtonHandle = await page.evaluateHandle(() => {
+        let updateButton =  document.querySelector("body > sn-workspace-layout > sn-workspace-main > sn-workspace-content").shadowRoot
+            .querySelector("sn-interaction-custom-renderer").shadowRoot
+            .querySelector("now-record-form-connected").shadowRoot
+            .querySelector("div > sn-form-internal-workspace-form-layout").shadowRoot
+            .querySelector("form > sn-form-internal-header-layout").shadowRoot
+            .querySelector("header > div > div.sn-header-layout-content.-last > now-record-common-uiactionbar").shadowRoot
+            .querySelector("sn-form-internal-uiactionbar").shadowRoot
+            .querySelector("div > div > div:nth-child(1) > now-button:nth-child(3)").shadowRoot
+            .querySelector("button")
+        return updateButton
+    })
+    return updateButtonHandle
 }
 
 function getType(title){
@@ -168,7 +232,6 @@ function getType(title){
     if (title.startsWith("Current Referrer Application Form :")) {
         return "New Referrer"
     }
-
     //Mimecast
     if(title === "You have new held messages") {
         return "Mimecast"
@@ -176,6 +239,17 @@ function getType(title){
     //Pacs Account
     if(title.startsWith("New account application:")) {
         return "Pacs"
+    }
+    //Onboarding
+    if(title.startsWith("I.T On-Boarding Form -")) {
+        return "Staff"
+    }
+    //Transfer Images
+    if((title.toLowerCase().includes("transfer")|| title.toLowerCase().includes("forward") || title.toLowerCase().includes("request")) && (title.toLowerCase().includes("images") || title.toLowerCase().includes("image"))) {
+        return "Transfer"
+    }
+    if(title.startsWith("Tisza sent you")) {
+        return "Transfer"
     }
     return "None"
 }
@@ -219,28 +293,10 @@ async function getDescription(page) {
     return descriptionHandle
 }
 
-async function getTemplateButton(page, type) {
-    let template;
+async function getTemplateButton(page, template) {
 
-    switch(type) {
-        case "Data Mismatch":
-            template = 2;
-            break;
-        case "Mimecast":
-            template = 3;
-            break;
-        case "New Referrer":
-            template = 4;
-            break;
-        case "Pacs":
-            template = 5;
-            break;
-        default:
-            template = 0;
-            break;
-    }
     await page.waitForSelector("body > sn-workspace-layout > sn-workspace-main > sn-workspace-content")
-    await page.waitForTimeout(100);
+    await page.waitForTimeout(200);
     let templateButton = await page.evaluateHandle((template)=> {
         card = document.querySelector("body > sn-workspace-layout > sn-workspace-main > sn-workspace-content").shadowRoot
             .querySelector("now-record-form-connected").shadowRoot
