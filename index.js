@@ -39,9 +39,7 @@ async function getButtonsFromShadowRoot(shadowRootHandle) {
 
 
 (async () => {
-    //const url = "https://rhcgroupprod.service-now.com/now/workspace/agent/home/sub/non_record/layout/params/list-title/New%20interactions/table/interaction/query/state%3Dnew/workspace-config-id/7b24ceae5304130084acddeeff7b12a3/word-wrap/false/disable-quick-edit/true"
-   // const url = "https://rhcgroupprod.service-now.com/now/workspace/agent/record/interaction/078da68f871fa510f051cae20cbb353c/sub/record/incident/72bd2e8f871fa510f051cae20cbb3533"
-    const url = "https://rhcgroupprod.service-now.com/now/workspace/agent/record/interaction/647377878793e510f051cae20cbb35ed"
+    const url = "https://rhcgroupprod.service-now.com/now/workspace/agent/home/sub/non_record/layout/params/list-title/New%20interactions/table/interaction/query/state%3Dnew/workspace-config-id/7b24ceae5304130084acddeeff7b12a3/word-wrap/false/disable-quick-edit/true"
 
     const browser = await puppeteer.launch({headless: false});
     const page = await browser.newPage();
@@ -60,8 +58,7 @@ async function getButtonsFromShadowRoot(shadowRootHandle) {
     await page.waitForTimeout(1000);
 
     while(true) {
-       //await search(page);
-        await descriptionEditTest(page);
+        await search(page);
         await page.waitForTimeout(10000);
 
         //get Refresh button
@@ -104,8 +101,7 @@ async function search(page){
         // handle navigation if necessary
 
         await page.waitForTimeout(1000);
-        //Create incident
-
+        //Check description for urgency
         let description = await getDescription(page);
         let isUrgent = await page.evaluate((description,title) => {
             if (description.value === '') description.value = title
