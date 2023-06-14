@@ -220,6 +220,7 @@ async function getUpdateButton(page) {
 }
 
 function getType(title){
+    let lowTitle = title.toLowerCase();
     //Comrad
     if(title.startsWith("COMRAD") && title.endsWith('.alert')) {
         return "Data Mismatch"
@@ -251,6 +252,9 @@ function getType(title){
     if((title.toLowerCase().includes("transfer")|| title.toLowerCase().includes("forward") || title.toLowerCase().includes("request")) && (title.toLowerCase().includes("images") || title.toLowerCase().includes("image"))) {
         return "Transfer"
     }
+    if(title.toLowerCase().includes("prior imaging")) {
+        return "Transfer"
+    }
     if(title.startsWith("Tisza sent you")) {
         return "Transfer"
     }
@@ -265,6 +269,10 @@ function getType(title){
     }
     if(title.toLowerCase().includes("From Kyocera")) {
         return "Transfer"
+    }
+
+    if(lowTitle.includes("image") && lowTitle("delete")) {
+        return "Delete"
     }
     return "None"
 }
