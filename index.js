@@ -39,6 +39,7 @@ async function getButtonsFromShadowRoot(shadowRootHandle) {
 
 
 let ticketCount = 0;
+const URGENT = 12;
 (async () => {
     const url = "https://rhcgroupprod.service-now.com/now/workspace/agent/home/sub/non_record/layout/params/list-title/New%20interactions/table/interaction/query/state%3Dnew/workspace-config-id/7b24ceae5304130084acddeeff7b12a3/word-wrap/false/disable-quick-edit/true"
 
@@ -102,7 +103,8 @@ async function search(page){
                 return (description.value)
         }, description, linkSelector.text)
         handleClick(page, await getUpdateButton(page))
-        isUrgent = getUrgency(descriptionValue)
+
+        let isUrgent = getUrgency(descriptionValue)
 
         await page.waitForTimeout(500);
 
@@ -116,12 +118,17 @@ async function search(page){
         await page.waitForNavigation({waitUntil: 'networkidle2'})
         await page.waitForTimeout(2000);
         //Click on template
-        let templateType = getTemplateType(getType(linkSelector.text),isUrgent);
+        let templateType = getTemplateType(getType(linkSelector.text));
 
         let templateButton = await getTemplateButton(page,templateType);
         await page.evaluate((button) => {
             button.click()
         },templateButton)
+
+        if (isUrgent) {
+            let urgentButton = await getTemplateButton(page, URGENT)
+            handleClick(page, urgentButton)
+        }
 
         await page.waitForTimeout(500);
         let saveButton = await getSaveButton(page);
@@ -145,20 +152,8 @@ function getUrgency(description) {
     return searchPattern.test(text.replace(/[.,\/#!$%\^&\*;:{}=\-_`~()]/g," "))
 }
 
-function getTemplateType(type, urgent) {
+function getTemplateType(type) {
     let template;
-
-    if (urgent) {
-        switch(type) {
-            case "Transfer":
-                template = 9;
-                break;
-            default:
-                template = 0;
-                break;
-        }
-
-    } else {
         switch(type) {
             case "Data Mismatch":
                 template = 1;
@@ -249,6 +244,9 @@ function getType(title){
         return "Staff"
     }
     //Transfer Images
+    if(title.toLowerCase().includes("FW: Images")) {
+        return "Transfer"
+    }
     if((title.toLowerCase().includes("transfer")|| title.toLowerCase().includes("forward") || title.toLowerCase().includes("request")) && (title.toLowerCase().includes("images") || title.toLowerCase().includes("image"))) {
         return "Transfer"
     }
