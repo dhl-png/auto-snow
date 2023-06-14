@@ -178,6 +178,9 @@ function getTemplateType(type, urgent) {
             case "Staff":
                 template = 10;
                 break;
+            case "NHI":
+                template = 11;
+                break;
             default:
                 template = 0;
                 break;
@@ -249,6 +252,18 @@ function getType(title){
         return "Transfer"
     }
     if(title.startsWith("Tisza sent you")) {
+        return "Transfer"
+    }
+    if(title.startsWith("Loading external images")) {
+        return "Transfer"
+    }
+    if(title.includes("(M/" ) || title.includes("(F/")) {
+        return "Transfer"
+    }
+    if(title.toLowerCase().includes("patient gender")) {
+        return "NHI"
+    }
+    if(title.toLowerCase().includes("From Kyocera")) {
         return "Transfer"
     }
     return "None"
