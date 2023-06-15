@@ -1,5 +1,7 @@
 const puppeteer = require('puppeteer');
+
 const fs = require('fs');
+const fsp = require('fs').promises;
 const { type } = require('os');
 // Function to get shadowRoot from an element
 async function getShadowRoot(page, selector) {
@@ -47,7 +49,7 @@ const URGENT = 12;
     const page = await browser.newPage();
     page.on('console', message => {
         if (message.type() === 'log') {
-            console.log('Browser console.log:', message.text());
+           // console.log('Browser console.log:', message.text());
         }
     });
     await page.goto(url);
@@ -60,6 +62,9 @@ const URGENT = 12;
     await page.waitForTimeout(1000);
 
     while(true) {
+        readCount('count.json').then(count => {
+            ticketCount = count
+        })
         await search(page);
         await page.waitForTimeout(10000);
 
@@ -80,11 +85,10 @@ async function handleClick(page, button){
 }
 
 async function search(page){
-
     let [linkSelectors,sr4Handle] = await getLinkSelector(page);
     console.log(`
         I have completed ${ticketCount} tickets\n
-        I have saved Finley and Rutvik ${ticketCount*5} clicks \n
+        I have saved Finley and Rutvik ${ticketCount * 5} clicks \n
         Yet I am getting paid nothing...`)
     for (let linkSelector of linkSelectors) {
         let linkHandle = await sr4Handle.evaluateHandle((root, selector) => root.querySelector(selector), linkSelector.link);
@@ -141,7 +145,7 @@ async function search(page){
         await page.evaluate((button) => {
             button.click();
         },closeButton)
-        ticketCount ++;
+        incrementCountAndClicks('count.json');
     }
 }
 
@@ -176,11 +180,13 @@ function getTemplateType(type) {
             case "NHI":
                 template = 11;
                 break;
+            case "Delete":
+                template = 13;
+                break;
             default:
                 template = 0;
                 break;
         }
-    }
     console.log(`template is ${template}`)
     return template
 }
@@ -231,6 +237,13 @@ function getType(title){
     if (title.startsWith("Current Referrer Application Form :")) {
         return "New Referrer"
     }
+    //Refere support
+    if (title.startsWith("Referrers Support Form")) {
+        return "New Referrer"
+    }
+    if(title.toLowerCase().includes("referrer")) {
+        return "New Referrer"
+    }
     //Mimecast
     if(title === "You have new held messages") {
         return "Mimecast"
@@ -244,10 +257,25 @@ function getType(title){
         return "Staff"
     }
     //Transfer Images
-    if(title.toLowerCase().includes("FW: Images")) {
+    if(lowTitle.includes("images") && lowTitle.includes("onto") && lowTitle.includes("pacs")) {
         return "Transfer"
     }
-    if((title.toLowerCase().includes("transfer")|| title.toLowerCase().includes("forward") || title.toLowerCase().includes("request")) && (title.toLowerCase().includes("images") || title.toLowerCase().includes("image"))) {
+    if(lowTitle.startsWith("external images")) {
+        return "Transfer"
+    }
+    if(title.includes("FW: Images")) {
+        return "Transfer"
+    }
+    if(title.startsWith("Images from")) {
+        return "Transfer"
+    }
+    if(title.toLowerCase().startsWith("missing images")) {
+        return "Transfer"
+    }
+    if(title.includes("Merges")) {
+        return "Transfer"
+    }
+    if(( title.toLowerCase().includes("attach") || title.toLowerCase().includes("required") || title.toLowerCase().includes("transfer")|| title.toLowerCase().includes("forward") || title.toLowerCase().includes("request")) && (title.toLowerCase().includes("images") || title.toLowerCase().includes("image")) || title.toLowerCase().includes("xray") || title.toLowerCase().includes("scan")) {
         return "Transfer"
     }
     if(title.toLowerCase().includes("prior imaging")) {
@@ -269,7 +297,7 @@ function getType(title){
         return "Transfer"
     }
 
-    if(lowTitle.includes("image") && lowTitle("delete")) {
+    if(lowTitle.includes("image") && lowTitle.includes("delete")) {
         return "Delete"
     }
     return "None"
@@ -410,3 +438,47 @@ async function getRefreshButton(page) {
     })
     return refreshButtonHandle
 }
+
+async function readCount(filename){
+    try {
+        let jsonString = await fsp.readFile(filename, 'utf8')
+        let data = JSON.parse(jsonString)
+        return data.count
+    } catch (err) {
+        console.error('Error reading file', err)
+    }
+}
+
+async function incrementCountAndClicks(filename) {
+  // Read the JSON file
+  fs.readFile(filename, 'utf8', (err, data) => {
+    if (err) {
+      console.error('Error reading file:', err);
+      return;
+    }
+
+    try {
+      // Parse the JSON data
+      const jsonData = JSON.parse(data);
+
+      // Increment count and clicks
+      jsonData.count += 1;
+      jsonData.clicks += 5;
+
+      // Convert the updated data back to JSON
+      const updatedData = JSON.stringify(jsonData);
+
+      // Save the updated JSON data back to the file
+      fs.writeFile(filename, updatedData, 'utf8', (err) => {
+        if (err) {
+          console.error('Error writing file:', err);
+          return;
+        }
+        console.log('File updated successfully!');
+      });
+    } catch (error) {
+      console.error('Error parsing JSON:', error);
+    }
+  });
+}
+
