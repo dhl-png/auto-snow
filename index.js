@@ -108,7 +108,7 @@ async function search(page){
         }, description, linkSelector.text)
         handleClick(page, await getUpdateButton(page))
 
-        let isUrgent = getUrgency(descriptionValue)
+        let isUrgent = getUrgency(descriptionValue,linkSelector.text)
 
         await page.waitForTimeout(500);
 
@@ -128,6 +128,7 @@ async function search(page){
         await page.evaluate((button) => {
             button.click()
         },templateButton)
+        await page.waitForTimeout(500);
 
         if (isUrgent) {
             let urgentButton = await getTemplateButton(page, URGENT)
@@ -140,7 +141,7 @@ async function search(page){
             button.click();
         },saveButton)
 
-        await page.waitForTimeout(500);
+        await page.waitForNetworkIdle({idleTime: 100, timeout: 60000});
         let closeButton = await getCloseButton(page);
         await page.evaluate((button) => {
             button.click();
@@ -149,11 +150,27 @@ async function search(page){
     }
 }
 
+async function waitForNetworkIdle0(page) {
+    let activeRequests = 0;
+    // Listen for all requests and increase the counter.
+    await page.on('request', () => activeRequests++);
 
-function getUrgency(description) {
-    let text = description.toLowerCase()
+    // Listen for all responses and decrease the counter.
+    await page.on('response', () => activeRequests--);
+    console.log(activeRequests)
+    // Click on the button to save the ticket
+    // Wait until there are no more active requests.
+    while (activeRequests > 0) {
+        await page.waitForTimeout(500);  // Pause for 100ms before checking again.
+    }
+    return true
+}
+function getUrgency(description,title) {
+    let descriptionText = description.toLowerCase()
+    let titleText = title.toLowerCase()
     let searchPattern = /(urgent|urgently|asap)/gi;
-    return searchPattern.test(text.replace(/[.,\/#!$%\^&\*;:{}=\-_`~()]/g," "))
+    let regexNoSpecialChars = /[.,\/#!$%\^&\*;:{}=\-_`~()]/g;
+    return (searchPattern.test(descriptionText.replace(regexNoSpecialChars, " ")) || searchPattern.test(titleText.replace(regexNoSpecialChars, " ")))
 }
 
 function getTemplateType(type) {
@@ -245,7 +262,7 @@ function getType(title){
         return "New Referrer"
     }
     //Mimecast
-    if(title === "You have new held messages") {
+    if(title.includes("You have new held messages")) {
         return "Mimecast"
     }
     //Pacs Account
@@ -275,7 +292,18 @@ function getType(title){
     if(title.includes("Merges")) {
         return "Transfer"
     }
-    if(( title.toLowerCase().includes("attach") || title.toLowerCase().includes("required") || title.toLowerCase().includes("transfer")|| title.toLowerCase().includes("forward") || title.toLowerCase().includes("request")) && (title.toLowerCase().includes("images") || title.toLowerCase().includes("image")) || title.toLowerCase().includes("xray") || title.toLowerCase().includes("scan")) {
+    if(( title.toLowerCase().includes("attach")
+        || title.toLowerCase().includes("required")
+        || title.toLowerCase().includes("transfer")
+        || title.toLowerCase().includes("forward")
+        || title.toLowerCase().includes("request"))
+        &&
+        (title.toLowerCase().includes("images")
+        || title.toLowerCase().includes("image"))
+        || title.toLowerCase().includes("xray")
+        || title.toLowerCase().includes("scan")
+        || title.toLowerCase().includes("imaging")
+    ) {
         return "Transfer"
     }
     if(title.toLowerCase().includes("prior imaging")) {
