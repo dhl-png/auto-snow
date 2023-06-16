@@ -20,7 +20,7 @@ async function getButtonsFromShadowRoot(shadowRootHandle) {
     console.clear()
     const getTypeStr = getType.toString();
 
-    return await shadowRootHandle.evaluate((sr4, getTypeStr)=> {
+    return await shadowRootHandle.evaluate((sr4, getTypeStr) => {
         let getType = new Function(`return ${getTypeStr}`)(getTypeStr);
         let rows = sr4.querySelectorAll('.table-body > tr');
         let linkElements = [];
@@ -30,7 +30,7 @@ async function getButtonsFromShadowRoot(shadowRootHandle) {
             let linkElement = cells[2].querySelector('a');
             let text = cells[4].textContent;
             console.log(`The text is ${text}`)
-            let type =  getType(text);
+            let type = getType(text);
             if (type === "None") continue;
             linkElements.push({ link: `.table-body > tr:nth-child(${i + 1}) td:nth-child(3) a`, text: text, type: type });
         }
@@ -45,23 +45,23 @@ const URGENT = 12;
 (async () => {
     const url = "https://rhcgroupprod.service-now.com/now/workspace/agent/home/sub/non_record/layout/params/list-title/New%20interactions/table/interaction/query/state%3Dnew/workspace-config-id/7b24ceae5304130084acddeeff7b12a3/word-wrap/false/disable-quick-edit/true"
 
-    const browser = await puppeteer.launch({headless: false});
+    const browser = await puppeteer.launch({ headless: false });
     const page = await browser.newPage();
     page.on('console', message => {
         if (message.type() === 'log') {
-           // console.log('Browser console.log:', message.text());
+            console.log('Browser console.log:', message.text());
         }
     });
     await page.goto(url);
     await login(page);
     await page.waitForNavigation();
-    await page.setViewport({width: 1920, height: 1080});
+    await page.setViewport({ width: 1920, height: 1080 });
 
     //Give time for the shadow roots to load
     await page.waitForSelector('body > sn-workspace-layout > sn-workspace-main > sn-workspace-primary-content')
     await page.waitForTimeout(1000);
 
-    while(true) {
+    while (true) {
         readCount('count.json').then(count => {
             ticketCount = count
         })
@@ -78,14 +78,14 @@ const URGENT = 12;
 })();
 
 
-async function handleClick(page, button){
+async function handleClick(page, button) {
     await page.evaluate((button) => {
         button.click();
-    },button)
+    }, button)
 }
 
-async function search(page){
-    let [linkSelectors,sr4Handle] = await getLinkSelector(page);
+async function search(page) {
+    let [linkSelectors, sr4Handle] = await getLinkSelector(page);
     console.log(`
         I have completed ${ticketCount} tickets\n
         I have saved Finley and Rutvik ${ticketCount * 5} clicks \n
@@ -100,34 +100,35 @@ async function search(page){
         await page.waitForTimeout(1000);
         //Check description for urgency
         let description = await getDescription(page);
-        let descriptionValue = await page.evaluate((description,title) => {
+        let descriptionValue = await page.evaluate((description, title) => {
             if (description.value === '') {
                 description.value = title
+                description.dispatchEvent(new Event('input'))
             }
-                return (description.value)
+            return (description.value)
         }, description, linkSelector.text)
         handleClick(page, await getUpdateButton(page))
 
-        let isUrgent = getUrgency(descriptionValue,linkSelector.text)
+        let isUrgent = getUrgency(descriptionValue, linkSelector.text)
 
         await page.waitForTimeout(500);
 
         let incidentButton = await getIncidentButton(page);
         await page.evaluate((button) => {
-             button.click();
+            button.click();
         }, incidentButton)
 
-        if(isUrgent){console.log("AAHHHHHHHHH")}
+        if (isUrgent) { console.log("AAHHHHHHHHH") }
 
-        await page.waitForNavigation({waitUntil: 'networkidle2'})
+        await page.waitForNavigation({ waitUntil: 'networkidle2' })
         await page.waitForTimeout(2000);
         //Click on template
         let templateType = getTemplateType(getType(linkSelector.text));
 
-        let templateButton = await getTemplateButton(page,templateType);
+        let templateButton = await getTemplateButton(page, templateType);
         await page.evaluate((button) => {
             button.click()
-        },templateButton)
+        }, templateButton)
         await page.waitForTimeout(500);
 
         if (isUrgent) {
@@ -135,37 +136,28 @@ async function search(page){
             handleClick(page, urgentButton)
         }
 
+        await page.waitForTimeout(100);
+        if (linkSelector.type == "Staff") await changeRequesterName(page)
+
         await page.waitForTimeout(500);
         let saveButton = await getSaveButton(page);
         await page.evaluate((button) => {
             button.click();
-        },saveButton)
+        }, saveButton)
 
-        await page.waitForNetworkIdle({idleTime: 100, timeout: 60000});
+        await page.waitForNetworkIdle({ idleTime: 100, timeout: 5000}).catch((error) => {
+            console.log("Network is too busy to go fast :(")
+        })
+
         let closeButton = await getCloseButton(page);
         await page.evaluate((button) => {
             button.click();
-        },closeButton)
+        }, closeButton)
         incrementCountAndClicks('count.json');
     }
 }
 
-async function waitForNetworkIdle0(page) {
-    let activeRequests = 0;
-    // Listen for all requests and increase the counter.
-    await page.on('request', () => activeRequests++);
-
-    // Listen for all responses and decrease the counter.
-    await page.on('response', () => activeRequests--);
-    console.log(activeRequests)
-    // Click on the button to save the ticket
-    // Wait until there are no more active requests.
-    while (activeRequests > 0) {
-        await page.waitForTimeout(500);  // Pause for 100ms before checking again.
-    }
-    return true
-}
-function getUrgency(description,title) {
+function getUrgency(description, title) {
     let descriptionText = description.toLowerCase()
     let titleText = title.toLowerCase()
     let searchPattern = /(urgent|urgently|asap)/gi;
@@ -175,39 +167,56 @@ function getUrgency(description,title) {
 
 function getTemplateType(type) {
     let template;
-        switch(type) {
-            case "Data Mismatch":
-                template = 1;
-                break;
-            case "Mimecast":
-                template = 2;
-                break;
-            case "New Referrer":
-                template = 3;
-                break;
-            case "Pacs":
-                template = 4;
-                break;
-            case "Transfer":
-                template = 8;
-                break
-            case "Staff":
-                template = 10;
-                break;
-            case "NHI":
-                template = 11;
-                break;
-            case "Delete":
-                template = 13;
-                break;
-            default:
-                template = 0;
-                break;
-        }
+    switch (type) {
+        case "Data Mismatch":
+            template = 1;
+            break;
+        case "Mimecast":
+            template = 2;
+            break;
+        case "New Referrer":
+            template = 3;
+            break;
+        case "Pacs":
+            template = 4;
+            break;
+        case "Transfer":
+            template = 8;
+            break
+        case "Staff":
+            template = 10;
+            break;
+        case "NHI":
+            template = 11;
+            break;
+        case "Delete":
+            template = 13;
+            break;
+        case "Visit":
+            template = 14;
+            break;
+        default:
+            template = 0;
+            break;
+    }
     console.log(`template is ${template}`)
     return template
 }
+async function changeRequesterName(page){
+    let descriptionHandle = await getOnBoardDescription(page)
+    let description = await page.evaluate((description) => {
+        return description.value
+    }, descriptionHandle)
 
+    console.log("post parsed description: " + description)
+    let email = getEmailFromDescription(description)
+
+    let requesterInput = await getRequestedFor(page)
+    await requesterInput.evaluateHandle((input,email) => {
+        input.value = email
+        input.dispatchEvent(new Event('input'))
+    }, email)
+}
 async function getLinkSelector(page) {
 
     let srHandle = await getShadowRoot(page, 'body > sn-workspace-layout > sn-workspace-main > sn-workspace-primary-content');
@@ -223,7 +232,7 @@ async function getUpdateButton(page) {
     await page.waitForSelector("body > sn-workspace-layout > sn-workspace-main > sn-workspace-content")
     await page.waitForTimeout(200);
     let updateButtonHandle = await page.evaluateHandle(() => {
-        let updateButton =  document.querySelector("body > sn-workspace-layout > sn-workspace-main > sn-workspace-content").shadowRoot
+        let updateButton = document.querySelector("body > sn-workspace-layout > sn-workspace-main > sn-workspace-content").shadowRoot
             .querySelector("sn-interaction-custom-renderer").shadowRoot
             .querySelector("now-record-form-connected").shadowRoot
             .querySelector("div > sn-form-internal-workspace-form-layout").shadowRoot
@@ -237,16 +246,43 @@ async function getUpdateButton(page) {
     return updateButtonHandle
 }
 
-function getType(title){
+function getEmailFromDescription(description) {
+    let regex = /by:\s*([\w.-]+@[\w.-]+\.\w+)/;
+    const match = description.match(regex)
+    if (match) return match[1];
+
+    return null;
+}
+async function getOnBoardDescription(page) {
+   await page.waitForSelector("body > sn-workspace-layout > sn-workspace-main > sn-workspace-content")
+    await page.waitForTimeout(1000)
+    let descriptionHandle = await page.evaluateHandle(() => {
+      let description = document.querySelector("body > sn-workspace-layout > sn-workspace-main > sn-workspace-content").shadowRoot
+            .querySelector("now-record-form-connected").shadowRoot
+            .querySelector("div > sn-form-internal-workspace-form-layout").shadowRoot
+            .querySelector("form > section > div > now-record-form-blob").shadowRoot
+            .querySelector("sn-form-internal-tabs").shadowRoot
+            .querySelector("section > sn-form-internal-tab-contents").shadowRoot
+            .querySelector("#tab_panel_0_undefined > now-record-form-section-column-layout").shadowRoot
+            .querySelector("div > div > div.sn-form-column-layout-left-col.sn-form-column-layout-col.resizable-controller.resizable-left-column.flex-resize.state-resizing > div.sn-form-column-layout-sections > section:nth-child(1) > div > div > div:nth-child(6) > div > sn-record-input-connected:nth-child(2)").shadowRoot
+            .querySelector("now-textarea").shadowRoot
+            .querySelector("textarea")
+        console.log("Beffore parsed desc: " + description.value)
+        return description
+    })
+    return descriptionHandle
+}
+
+function getType(title) {
     let lowTitle = title.toLowerCase();
     //Comrad
-    if(title.startsWith("COMRAD") && title.endsWith('.alert')) {
+    if (title.startsWith("COMRAD") && title.endsWith('.alert')) {
         return "Data Mismatch"
     }
-    if(title.startsWith("COMRAD") && title.endsWith('exception')) {
+    if (title.startsWith("COMRAD") && title.endsWith('exception')) {
         return "Data Mismatch"
     }
-        //New Refer
+    //New Refer
     if (title.startsWith("New Referrer Application Form :")) {
         return "New Referrer"
     }
@@ -258,82 +294,109 @@ function getType(title){
     if (title.startsWith("Referrers Support Form")) {
         return "New Referrer"
     }
-    if(title.toLowerCase().includes("referrer")) {
+    if (title.toLowerCase().includes("referrer")) {
         return "New Referrer"
     }
     //Mimecast
-    if(title.includes("You have new held messages")) {
+    if (title.includes("You have new held messages")) {
         return "Mimecast"
     }
     //Pacs Account
-    if(title.startsWith("New account application:")) {
+    if (title.startsWith("New account application:")) {
         return "Pacs"
     }
     //Onboarding
-    if(title.startsWith("I.T On-Boarding Form -")) {
+    if (title.startsWith("I.T On-Boarding Form -")) {
         return "Staff"
     }
     //Transfer Images
-    if(lowTitle.includes("images") && lowTitle.includes("onto") && lowTitle.includes("pacs")) {
+    if (lowTitle.match("/\bimage(s)?\b/gi") && lowTitle.match("/pac/gi")) {
         return "Transfer"
     }
-    if(lowTitle.startsWith("external images")) {
+    if (lowTitle.startsWith("external images")) {
         return "Transfer"
     }
-    if(title.includes("FW: Images")) {
+    if (title.includes("FW: Images")) {
         return "Transfer"
     }
-    if(title.startsWith("Images from")) {
+    if (title.startsWith("Images from")) {
         return "Transfer"
     }
-    if(title.toLowerCase().startsWith("missing images")) {
+    if (title.toLowerCase().startsWith("missing images")) {
         return "Transfer"
     }
-    if(title.includes("Merges")) {
+    if (title.includes("Merges")) {
         return "Transfer"
     }
-    if(( title.toLowerCase().includes("attach")
+    if ((title.toLowerCase().includes("attach")
         || title.toLowerCase().includes("required")
         || title.toLowerCase().includes("transfer")
         || title.toLowerCase().includes("forward")
         || title.toLowerCase().includes("request"))
+        || title.toLowerCase().includes("to")
         &&
         (title.toLowerCase().includes("images")
-        || title.toLowerCase().includes("image"))
+            || title.toLowerCase().includes("image"))
         || title.toLowerCase().includes("xray")
         || title.toLowerCase().includes("scan")
         || title.toLowerCase().includes("imaging")
     ) {
         return "Transfer"
     }
-    if(title.toLowerCase().includes("prior imaging")) {
+    if (title.toLowerCase().includes("prior imaging")) {
         return "Transfer"
     }
-    if(title.startsWith("Tisza sent you")) {
+    if (title.startsWith("Tisza sent you")) {
         return "Transfer"
     }
-    if(title.startsWith("Loading external images")) {
+    if (title.startsWith("Loading external images")) {
         return "Transfer"
     }
-    if(title.includes("(M/" ) || title.includes("(F/")) {
+    if (title.includes("(M/") || title.includes("(F/")) {
         return "Transfer"
     }
-    if(title.toLowerCase().includes("patient gender")) {
+    if (title.toLowerCase().includes("patient gender")) {
         return "NHI"
     }
-    if(title.toLowerCase().includes("From Kyocera")) {
+    if (title.toLowerCase().match("\bvisit(s)?\b")) {
+        return "Visit"
+    }
+    if (title.toLowerCase().includes("from kyocera")) {
         return "Transfer"
     }
 
-    if(lowTitle.includes("image") && lowTitle.includes("delete")) {
+    if (lowTitle.includes("image")
+        && (lowTitle.includes("delete"))
+        || (lowTitle.includes("deleting")) ) {
         return "Delete"
     }
     return "None"
 }
 
-async function login(page){
+async function getRequestedFor(page) {
+    await page.waitForSelector("body > sn-workspace-layout > sn-workspace-main > sn-workspace-content")
+    await page.waitForTimeout(300);
 
-// Login
+    let requesterHandle = await page.evaluateHandle(() => {
+        let requesterInput =  document.querySelector("body > sn-workspace-layout > sn-workspace-main > sn-workspace-content").shadowRoot
+            .querySelector("now-record-form-connected").shadowRoot
+            .querySelector("div > sn-form-internal-workspace-form-layout").shadowRoot
+            .querySelector("form > section > div > now-record-form-blob").shadowRoot
+            .querySelector("sn-form-internal-tabs").shadowRoot
+            .querySelector("section > sn-form-internal-tab-contents").shadowRoot
+            .querySelector("#tab_panel_0_undefined > now-record-form-section-column-layout").shadowRoot
+            .querySelector("div > div > div.sn-form-column-layout-left-col.sn-form-column-layout-col.resizable-controller.resizable-left-column.flex-resize.state-resizing > div.sn-form-column-layout-sections > section:nth-child(1) > div > div > div:nth-child(3) > div:nth-child(1) > sn-record-reference-connected").shadowRoot
+            .querySelector("now-record-typeahead").shadowRoot
+            .querySelector("now-typeahead").shadowRoot
+            .querySelector("input")
+        return requesterInput
+    })
+    return requesterHandle
+}
+
+async function login(page) {
+
+    // Login
     await page.waitForSelector('#i0116');
     await page.type('#i0116', 'finley.tohill@rhcnz.com');
 
@@ -341,7 +404,7 @@ async function login(page){
 
     await page.waitForSelector('#i0118');
 
-    await page.type('#i0118','desfgh345@');
+    await page.type('#i0118', 'desfgh345@');
     await page.waitForTimeout(6000);
 
     await page.evaluate(() => {
@@ -355,16 +418,16 @@ async function getDescription(page) {
 
     let descriptionHandle = await page.evaluateHandle(() => {
         let description = document.querySelector("body > sn-workspace-layout > sn-workspace-main > sn-workspace-content").shadowRoot
-        .querySelector("sn-interaction-custom-renderer").shadowRoot
-        .querySelector("now-record-form-connected").shadowRoot
-        .querySelector("div > sn-form-internal-workspace-form-layout").shadowRoot
-        .querySelector("form > section > div > now-record-form-blob").shadowRoot
-        .querySelector("sn-form-internal-tabs").shadowRoot
-        .querySelector("section > sn-form-internal-tab-contents").shadowRoot
-        .querySelector("now-record-form-section-column-layout").shadowRoot
-        .querySelector("div > div > div.sn-form-column-layout-left-col.sn-form-column-layout-col.resizable-controller.resizable-left-column.flex-resize.state-resizing > div > section > div > div > div:nth-child(6) > div > sn-record-input-connected:nth-child(2)").shadowRoot
-        .querySelector("now-textarea").shadowRoot
-        .querySelector("textarea[name=u_description]")
+            .querySelector("sn-interaction-custom-renderer").shadowRoot
+            .querySelector("now-record-form-connected").shadowRoot
+            .querySelector("div > sn-form-internal-workspace-form-layout").shadowRoot
+            .querySelector("form > section > div > now-record-form-blob").shadowRoot
+            .querySelector("sn-form-internal-tabs").shadowRoot
+            .querySelector("section > sn-form-internal-tab-contents").shadowRoot
+            .querySelector("now-record-form-section-column-layout").shadowRoot
+            .querySelector("div > div > div.sn-form-column-layout-left-col.sn-form-column-layout-col.resizable-controller.resizable-left-column.flex-resize.state-resizing > div > section > div > div > div:nth-child(6) > div > sn-record-input-connected:nth-child(2)").shadowRoot
+            .querySelector("now-textarea").shadowRoot
+            .querySelector("textarea[name=u_description]")
         return description
     });
     return descriptionHandle
@@ -374,7 +437,7 @@ async function getTemplateButton(page, template) {
 
     await page.waitForSelector("body > sn-workspace-layout > sn-workspace-main > sn-workspace-content")
     await page.waitForTimeout(200);
-    let templateButton = await page.evaluateHandle((template)=> {
+    let templateButton = await page.evaluateHandle((template) => {
         card = document.querySelector("body > sn-workspace-layout > sn-workspace-main > sn-workspace-content").shadowRoot
             .querySelector("now-record-form-connected").shadowRoot
             .querySelector("div > sn-form-internal-workspace-form-layout").shadowRoot
@@ -393,19 +456,19 @@ async function getIncidentButton(page) {
     await page.waitForSelector('body > sn-workspace-layout > sn-workspace-main > sn-workspace-content');
     await page.waitForTimeout(1000);
     let incidentButtonHandle = await page.evaluateHandle(() => {
-        const shadowRootList =  [
-        'now-record-form-connected',
-        'sn-form-internal-workspace-form-layout',
-        'sn-form-internal-header-layout',
-        'header > div > div.sn-header-layout-content.-last > now-record-common-uiactionbar',
-        'sn-form-internal-uiactionbar',
-        'div > div > div:nth-child(1) > now-button:nth-child(2)',]
+        const shadowRootList = [
+            'now-record-form-connected',
+            'sn-form-internal-workspace-form-layout',
+            'sn-form-internal-header-layout',
+            'header > div > div.sn-header-layout-content.-last > now-record-common-uiactionbar',
+            'sn-form-internal-uiactionbar',
+            'div > div > div:nth-child(1) > now-button:nth-child(2)',]
 
-        let sr  = document.querySelector('body > sn-workspace-layout > sn-workspace-main > sn-workspace-content').shadowRoot;
+        let sr = document.querySelector('body > sn-workspace-layout > sn-workspace-main > sn-workspace-content').shadowRoot;
         console.log("Got root")
         let sr1 = sr.querySelector('sn-interaction-custom-renderer').shadowRoot
         console.log("got seccond root")
-        for(let shadowRoot of shadowRootList) {
+        for (let shadowRoot of shadowRootList) {
             console.log(shadowRoot);
             let sr2 = sr1.querySelector(shadowRoot).shadowRoot;
             sr1 = sr2;
@@ -417,7 +480,7 @@ async function getIncidentButton(page) {
     return incidentButtonHandle
 }
 
-async function createIncident(page){
+async function createIncident(page) {
 
 }
 
@@ -438,7 +501,7 @@ async function getSaveButton(page) {
     await page.waitForSelector("body > sn-workspace-layout > sn-workspace-main > sn-workspace-content")
     await page.waitForTimeout(200);
     let saveButtonHandle = await page.evaluateHandle(() => {
-       let saveButton =  document.querySelector("body > sn-workspace-layout > sn-workspace-main > sn-workspace-content").shadowRoot
+        let saveButton = document.querySelector("body > sn-workspace-layout > sn-workspace-main > sn-workspace-content").shadowRoot
             .querySelector("now-record-form-connected").shadowRoot
             .querySelector("div > sn-form-internal-workspace-form-layout").shadowRoot
             .querySelector("form > sn-form-internal-header-layout").shadowRoot
@@ -467,7 +530,7 @@ async function getRefreshButton(page) {
     return refreshButtonHandle
 }
 
-async function readCount(filename){
+async function readCount(filename) {
     try {
         let jsonString = await fsp.readFile(filename, 'utf8')
         let data = JSON.parse(jsonString)
@@ -478,35 +541,35 @@ async function readCount(filename){
 }
 
 async function incrementCountAndClicks(filename) {
-  // Read the JSON file
-  fs.readFile(filename, 'utf8', (err, data) => {
-    if (err) {
-      console.error('Error reading file:', err);
-      return;
-    }
-
-    try {
-      // Parse the JSON data
-      const jsonData = JSON.parse(data);
-
-      // Increment count and clicks
-      jsonData.count += 1;
-      jsonData.clicks += 5;
-
-      // Convert the updated data back to JSON
-      const updatedData = JSON.stringify(jsonData);
-
-      // Save the updated JSON data back to the file
-      fs.writeFile(filename, updatedData, 'utf8', (err) => {
+    // Read the JSON file
+    fs.readFile(filename, 'utf8', (err, data) => {
         if (err) {
-          console.error('Error writing file:', err);
-          return;
+            console.error('Error reading file:', err);
+            return;
         }
-        console.log('File updated successfully!');
-      });
-    } catch (error) {
-      console.error('Error parsing JSON:', error);
-    }
-  });
+
+        try {
+            // Parse the JSON data
+            const jsonData = JSON.parse(data);
+
+            // Increment count and clicks
+            jsonData.count += 1;
+            jsonData.clicks += 5;
+
+            // Convert the updated data back to JSON
+            const updatedData = JSON.stringify(jsonData);
+
+            // Save the updated JSON data back to the file
+            fs.writeFile(filename, updatedData, 'utf8', (err) => {
+                if (err) {
+                    console.error('Error writing file:', err);
+                    return;
+                }
+                console.log('File updated successfully!');
+            });
+        } catch (error) {
+            console.error('Error parsing JSON:', error);
+        }
+    });
 }
 
